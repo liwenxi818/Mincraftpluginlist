@@ -1,0 +1,69 @@
+# Minecraft CS:GO Plugin Configuration
+# 플러그인 설정 파일
+
+# 게임 설정
+game:
+  # 라운드 시간 (초)
+  round-time: 120
+  
+  # 폭탄 폭발 시간 (초)
+  bomb-timer: 40
+  
+  # 폭탄 해제 시간 (초)
+  defuse-time: 10
+  
+  # 최대 라운드 수
+  max-rounds: 30
+  
+  # 라운드 시작 전 대기 시간 (초)
+  round-start-delay: 5
+
+# 경제 시스템 설정
+economy:
+  # 라운드 시작 시 지급되는 기본 금액
+  starting-money: 800
+  
+  # 라운드 승리 시 보너스
+  win-bonus: 3250
+  
+  # 라운드 패배 시 보너스
+  lose-bonus: 1400
+  
+  # 킬 보상
+  kill-reward: 300
+  
+  # 폭탄 설치 보상
+  plant-reward: 300
+  
+  # 폭탄 해제 보상
+  defuse-reward: 300
+
+# 무기 가격
+weapons:
+  pistol: 200
+  smg: 1500
+  rifle: 2700
+  sniper: 4750
+  shotgun: 1200
+  
+armor:
+  helmet: 350
+  vest: 650
+  
+equipment:
+  defuse-kit: 400
+  grenade: 300
+
+# 메시지 설정
+messages:
+  prefix: "&6[CS:GO]&r "
+  
+  game-start: "&a게임이 시작됩니다!"
+  round-start: "&e라운드 {round} 시작!"
+  round-end: "&6라운드 종료 - {winner} 승리!"
+  
+  bomb-planted: "&c💣 폭탄이 설치되었습니다!"
+  bomb-defused: "&a✓ 폭탄이 해제되었습니다!"
+  
+  team-terrorist: "&c테러리스트"
+  team-ct: "&9대테러부대"

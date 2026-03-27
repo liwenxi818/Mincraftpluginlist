@@ -1,0 +1,121 @@
+# Minecraft CS:GO Plugin Configuration
+# Complete Edition v2.0
+
+# 게임 설정
+game:
+  round-time: 120 # 라운드 시간 (초)
+  max-rounds: 30 # 최대 라운드 수
+  min-players: 2 # 최소 플레이어 수
+
+# 폭탄 설정
+bomb:
+  plant-time: 3 # 폭탄 설치 시간 (초)
+  defuse-time: 10 # 폭탄 해체 시간 (초)
+  explosion-time: 40 # 폭탄 폭발까지 시간 (초)
+  defuse-range: 2.0 # 해체 가능 거리 (블록)
+
+# 경제 설정
+economy:
+  start-money: 800 # 시작 금액
+  round-win-bonus: 3250 # 라운드 승리 보상
+  round-lose-bonus: 1400 # 라운드 패배 보상
+  kill-bonus: 300 # 킬 보상
+  assist-bonus: 150 # 어시스트 보상
+  max-money: 16000 # 최대 소지금
+
+# 무기 가격
+weapons:
+  pistol: 200 # 권총
+  smg: 1500 # SMG
+  rifle: 2700 # 라이플
+  sniper: 4750 # 스나이퍼
+  shotgun: 1200 # 샷건
+
+# 무기 설정 (데미지, 사거리, 쿨다운)
+weapon-stats:
+  pistol:
+    damage: 10.0
+    range: 30.0
+    cooldown: 200
+  smg:
+    damage: 8.0
+    range: 25.0
+    cooldown: 100
+  rifle:
+    damage: 15.0
+    range: 50.0
+    cooldown: 150
+  sniper:
+    damage: 30.0
+    range: 100.0
+    cooldown: 800
+  shotgun:
+    damage: 12.0
+    range: 15.0
+    cooldown: 600
+
+# 스폰 위치 (게임 내에서 /csgo setspawn 으로 설정)
+spawns:
+  terrorist:
+    ==: org.bukkit.Location
+    world: world
+    x: -1.1424734176896716
+    y: 14.5
+    z: 56.920698909721345
+    pitch: 8.495927
+    yaw: -93.396484
+  counter-terrorist:
+    ==: org.bukkit.Location
+    world: world
+    x: 101.5835826493057
+    y: 11.5
+    z: 62.89428553837802
+    pitch: 18.979235
+    yaw: 86.11621
+
+# 폭탄 지역 (게임 내에서 /csgo setbombsite 로 설정)
+bombsite:
+  radius: 10.0
+  location:
+    ==: org.bukkit.Location
+    world: world
+    x: 115.11552442695823
+    y: 15.0
+    z: 6.062101021611028
+    pitch: 64.6354
+    yaw: 94.38739
+  a:
+    location:
+      ==: org.bukkit.Location
+      world: world
+      x: 114.82951849354367
+      y: 15.0
+      z: 6.588314491099783
+      pitch: 42.204845
+      yaw: -91.201416
+    radius: 10.0
+  b:
+    location:
+      ==: org.bukkit.Location
+      world: world
+      x: 103.05780143309265
+      y: 18.0
+      z: 88.65301281132663
+      pitch: 54.37546
+      yaw: 93.04883
+    radius: 10.0
+
+# UI 설정
+ui:
+  scoreboard-enabled: true # 스코어보드 표시
+  scoreboard-update-interval: 20 # 업데이트 주기 (틱)
+  show-money: true # 돈 표시
+  show-stats: true # 통계 표시
+  show-team: true # 팀 표시
+
+# 통계 설정
+stats:
+  track-headshots: true # 헤드샷 기록
+  track-assists: true # 어시스트 기록
+  assist-timeout: 10000 # 어시스트 판정 시간 (밀리초)
+  save-stats: false # 통계 저장 (추후 구현)

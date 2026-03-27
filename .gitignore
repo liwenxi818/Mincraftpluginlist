@@ -1,0 +1,30 @@
+# 서버 바이너리
+*.jar
+cache/
+libraries/
+versions/
+
+# 월드 데이터
+world/
+world_*/
+
+# 로그
+logs/
+crash-reports/
+*.log
+*.log.gz
+
+# 런타임 생성 파일
+usercache.json
+banned-ips.json
+banned-players.json
+whitelist.json
+version_history.json
+.console_history
+session.lock
+
+# 플러그인 jar (config만 추적)
+plugins/*.jar
+
+# bStats
+plugins/bStats/
