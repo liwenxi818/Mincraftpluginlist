@@ -37,9 +37,48 @@ CS:GO 플러그인 설정 파일: `MinecraftServer_CSGO/plugins/MinecraftCSGO/co
 
 설정 가능한 주요 값: 라운드 시간, 경제(시작금액/킬보상/최대소지금), 무기 가격/스탯, 폭탄 타이머, UI 스코어보드.
 
-## Git Repository (minecraft_plugin/)
+## Windows .bat 파일 작성 규칙
 
-`MinecraftServer_CSGO/minecraft_plugin/`은 별도의 Git 저장소로, CS:GO 서버 설정과 플러그인 config만 추적한다.
+> **이 규칙을 반드시 지킬 것. bat 파일을 Write 툴로 직접 생성하면 LF + UTF-8로 저장되어 CMD가 오작동한다.**
+
+### 문제
+- `Write` 툴은 파일을 **LF 줄바꿈 + UTF-8** 인코딩으로 저장함
+- Windows CMD는 **CRLF 줄바꿈 + ANSI(CP949)** 인코딩을 요구함
+- LF bat 파일은 헤더 몇 줄 출력 후 **무음으로 멈추거나 명령어가 오파싱**됨
+- UTF-8 한국어 주석이 있으면 CMD가 글자를 쪼개어 `'ho'`, `'cho'`, `'ally'` 등 엉뚱한 오류를 냄
+
+### 해결책: PowerShell로 bat 파일 작성
+
+bat 파일은 반드시 아래 패턴으로 PowerShell을 통해 CP949 + CRLF로 저장한다:
+
+```powershell
+powershell.exe -NoProfile -Command "
+\$lines = @(
+    '@echo off',
+    'echo Hello',
+    'pause'
+)
+\$crlf = \$lines -join \"\`r\`n\"
+\$bytes = [System.Text.Encoding]::GetEncoding(949).GetBytes(\$crlf)
+[System.IO.File]::WriteAllBytes('C:\path\to\file.bat', \$bytes)
+"
+```
+
+### 추가 규칙
+- bat 파일 본문에 **한국어 사용 금지** (주석 포함) — 순수 ASCII만 사용
+- `>nul` 리다이렉션 사용 — `>/dev/null`은 Windows CMD에서 작동 안 함
+- `set "VAR=값"` 구문에서 경로에 공백이 있으면 반드시 따옴표로 감쌈
+- `%~dp0`으로 bat 파일 위치 기준 작업 디렉토리 고정: `cd /d "%~dp0"`
+
+---
+
+## GitHub
+
+- 레포지토리: **https://github.com/liwenxi818/Mincraftpluginlist**
+- GitHub CLI(`gh`)는 `liwenxi818` 계정으로 인증 완료 — 재로그인 불필요
+- `gh` 실행 경로: `C:\Program Files\GitHub CLI\gh.exe` (bash에서는 `"/c/Program Files/GitHub CLI/gh.exe"`)
+
+## Git Repository
 
 `.gitignore` 정책:
 - `.jar` 바이너리, `world/`, `logs/`, `cache/` 등은 제외
@@ -54,3 +93,68 @@ CS:GO 플러그인 설정 파일: `MinecraftServer_CSGO/plugins/MinecraftCSGO/co
 - `world/`, `world_nether/`, `world_the_end/` — 월드 데이터
 
 CS:GO 서버에는 `CommandBlockAsPlayer` 플러그인도 설치되어 있어 커맨드 블록이 플레이어 권한으로 명령 실행 가능.
+
+---
+
+## 마피아 플러그인 (개발 대기 중)
+
+> **나중에 "마피아 플러그인 파일 만들어줘" 라고 하면 아래 스펙대로 `MafiaPlugin/` 디렉토리에 전체 파일을 생성할 것.**
+> 소스 파일은 이미 `MafiaPlugin/` 에 작성되어 있음 — `mvn package` 로 빌드 가능.
+
+### 기본 정보
+- 위치: `MafiaPlugin/` (레포 루트)
+- 빌드: Maven, Java 17, Paper 1.20.4
+- 명령어: `/mafia join|leave|start|end|status|vote`
+
+### 게임 흐름
+1. `/mafia start` → 플랫 월드(`mafia_world`) 자동 생성
+2. 플레이어 수에 따라 역할 자동 배정 + 집 자동 건설 (7×5×7 오크 집, 4열 그리드) + 각자 집으로 스폰
+3. **낮 페이즈**: 2분 자유 토론 → 지목 GUI(30초) → 최후 변론(30초) → 처형 찬반 GUI(20초)
+4. **밤 페이즈**: 전원 집으로 강제 소환 → 마피아(60초) → 의사(60초) → 경찰(60초) → 결과 처리
+5. 게임 종료 시 월드 자동 삭제
+
+### 역할 구성 (인원별 자동 조정)
+| 인원 | 마피아 | 경찰 | 의사 | 조커 | 시민 |
+|------|--------|------|------|------|------|
+| 4~5명 | 1 | 1 | - | - | 나머지 |
+| 6~7명 | 2 | 1 | 1 | - | 나머지 |
+| 8~10명 | 2 | 1 | 1 | 1 | 나머지 |
+| 11명+ | 3 | 1 | 1 | 1 | 나머지 |
+
+### 역할 능력
+- **마피아**: 밤 GUI → 타겟 선택 → 처치. 마피아끼리 빨간 이름표 (scoreboard team)
+- **경찰**: 밤 GUI → 타겟 선택 → 역할 귓속말로 알림 + 타겟 집 발자국 파티클
+- **의사**: 밤 GUI → 타겟 선택 → 보호 (마피아 처치 무효)
+- **조커**: 밤 행동 없음. 낮 투표로 처형당하면 단독 승리
+- **시민**: 행동 없음
+
+### 승리 조건
+- 마피아: 생존 마피아 수 ≥ 생존 비마피아 수
+- 시민팀: 마피아 전원 제거
+- 조커: 낮 투표로 처형됨 (마피아 처치 X)
+
+### 기타
+- `keepInventory = true`, 사망 시 관전 모드
+- 밤 행동 후 타겟 집 입구에 발자국 파티클 (빨간 먼지 + FOOTSTEP)
+
+### 파일 구조
+```
+MafiaPlugin/
+├── pom.xml
+└── src/main/
+    ├── resources/plugin.yml
+    └── java/com/mafia/
+        ├── MafiaPlugin.java
+        ├── command/MafiaCommand.java
+        ├── game/GameState.java
+        ├── game/MafiaGame.java
+        ├── game/Role.java
+        ├── gui/ExecutionVoteGUI.java
+        ├── gui/NightActionGUI.java
+        ├── gui/NominationGUI.java
+        ├── listener/MafiaListener.java
+        ├── manager/GameManager.java
+        ├── manager/HouseManager.java
+        ├── manager/WorldManager.java
+        └── util/ParticleUtil.java
+```

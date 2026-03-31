@@ -1,0 +1,17 @@
+name: MafiaPlugin
+version: 1.0.0
+main: com.mafia.MafiaPlugin
+api-version: 1.20
+description: Mafia game plugin
+commands:
+  mafia:
+    description: Mafia game commands
+    usage: /mafia <join|leave|start|test|status|end|vote>
+    permission: mafia.use
+permissions:
+  mafia.use:
+    description: Allows using mafia commands
+    default: true
+  mafia.admin:
+    description: Allows admin mafia commands
+    default: op

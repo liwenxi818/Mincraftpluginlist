@@ -19,6 +19,7 @@ usercache.json
 banned-ips.json
 banned-players.json
 whitelist.json
+ops.json
 version_history.json
 .console_history
 session.lock
@@ -28,3 +29,9 @@ plugins/*.jar
 
 # bStats
 plugins/bStats/
+
+# Maven build output
+target/
+
+# Claude Code internal
+.claude/
