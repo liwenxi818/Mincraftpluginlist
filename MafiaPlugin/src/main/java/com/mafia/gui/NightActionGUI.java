@@ -2,6 +2,7 @@ package com.mafia.gui;
 
 import com.mafia.game.MafiaGame;
 import com.mafia.game.Role;
+import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -63,7 +64,10 @@ public class NightActionGUI {
             default -> "타겟 선택";
         };
 
-        int size = targetUUIDs.isEmpty() ? 9 : Math.min(54, (int) Math.ceil(targetUUIDs.size() / 9.0) * 9);
+        // +1 slot for the pass button
+        int itemCount = targetUUIDs.size() + 1;
+        int size = Math.min(54, (int) Math.ceil(itemCount / 9.0) * 9);
+        if (size == 0) size = 9;
 
         Material mat = switch (actorRole) {
             case MAFIA -> Material.RED_WOOL;
@@ -83,6 +87,17 @@ public class NightActionGUI {
             meta.displayName(Component.text(targetNames.get(i), NamedTextColor.WHITE));
             item.setItemMeta(meta);
             inv.setItem(i, item);
+        }
+
+        // Pass button
+        int passSlot = targetUUIDs.size();
+        if (passSlot < size) {
+            holder.getTargetIds().add(MafiaGame.PASS_UUID);
+            ItemStack passItem = new ItemStack(Material.GRAY_WOOL);
+            ItemMeta passMeta = passItem.getItemMeta();
+            passMeta.displayName(Component.text("패스 (기권)", NamedTextColor.GRAY, TextDecoration.ITALIC));
+            passItem.setItemMeta(passMeta);
+            inv.setItem(passSlot, passItem);
         }
 
         actor.openInventory(inv);

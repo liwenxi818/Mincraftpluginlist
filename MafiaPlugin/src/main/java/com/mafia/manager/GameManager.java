@@ -5,6 +5,7 @@ import com.mafia.game.GameState;
 import com.mafia.game.MafiaGame;
 import com.mafia.game.Role;
 import com.mafia.gui.ExecutionVoteGUI;
+import com.mafia.gui.MayorElectionGUI;
 import com.mafia.gui.NightActionGUI;
 import com.mafia.gui.NominationGUI;
 import com.mafia.util.ParticleUtil;
@@ -12,6 +13,8 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.*;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
@@ -98,6 +101,7 @@ public class GameManager {
             Location spawn = currentGame.getHouseSpawns().get(p.getUniqueId());
             if (spawn != null) p.teleport(spawn);
             p.setGameMode(GameMode.ADVENTURE);
+            applyGameBuffs(p);
 
             Role role = currentGame.getRole(p);
             p.sendMessage(Component.text("당신의 역할은 ", NamedTextColor.YELLOW)
@@ -114,7 +118,7 @@ public class GameManager {
         Bukkit.getScheduler().runTaskLater(plugin, this::startDay, 60L);
     }
 
-    public void startTestGame(Player starter) {
+    public void startTestGame(Player starter, int requestedBots) {
         if (currentGame != null) {
             starter.sendMessage(Component.text("게임이 이미 진행 중입니다.", NamedTextColor.RED));
             return;
@@ -140,8 +144,8 @@ public class GameManager {
         currentGame.setTestMode(true);
         lobby.clear();
 
-        // Fill with bots to reach 4 total
-        int needed = Math.max(0, 4 - players.size());
+        // botCount < 0: auto-fill to minimum 4; otherwise use exact count
+        int needed = (requestedBots < 0) ? Math.max(0, 4 - players.size()) : requestedBots;
         for (int i = 1; i <= needed; i++) {
             currentGame.addBot(UUID.randomUUID(), "BOT_" + i);
         }
@@ -154,6 +158,7 @@ public class GameManager {
             Location spawn = currentGame.getHouseSpawns().get(p.getUniqueId());
             if (spawn != null) p.teleport(spawn);
             p.setGameMode(GameMode.ADVENTURE);
+            applyGameBuffs(p);
 
             Role role = currentGame.getRole(p);
             p.sendMessage(Component.text("[테스트] 당신의 역할은 ", NamedTextColor.YELLOW)
@@ -243,9 +248,13 @@ public class GameManager {
         for (String entry : scoreboard.getEntries()) {
             if (!mafiaTeam.hasEntry(entry)) scoreboard.resetScores(entry);
         }
-        int score = 5;
+        int score = 6;
         obj.getScore("§e" + currentGame.getDayCount() + "일차").setScore(score--);
         obj.getScore("§f페이즈: " + currentGame.getState().name()).setScore(score--);
+        if (currentGame.getMayorUUID() != null) {
+            String mayorName = currentGame.getParticipantName(currentGame.getMayorUUID());
+            obj.getScore("§6시장: " + mayorName).setScore(score--);
+        }
         obj.getScore("§a생존: " + currentGame.getTotalAliveCount() + "명").setScore(score--);
         obj.getScore("§c사망: " + currentGame.getDeadPlayers().size() + "명").setScore(score--);
 
@@ -268,15 +277,110 @@ public class GameManager {
     public void startDay() {
         if (currentGame == null) return;
         currentGame.incrementDay();
-        currentGame.setState(GameState.DAY_DISCUSSION);
         int day = currentGame.getDayCount();
 
         broadcast(Component.text("=== " + day + "일차 낮 ===", NamedTextColor.YELLOW, TextDecoration.BOLD));
-        broadcast(Component.text("자유롭게 이동하고 토론하세요. 2분 후 투표를 시작합니다.", NamedTextColor.YELLOW));
+        for (Player p : currentGame.getAlivePlayers()) {
+            p.setGameMode(GameMode.ADVENTURE);
+            applyGameBuffs(p);
+        }
+        updateScoreboard();
+        cancelPhaseTask();
 
-        for (Player p : currentGame.getAlivePlayers()) p.setGameMode(GameMode.ADVENTURE);
+        if (day == 1) {
+            startMayorElection();
+        } else {
+            startDayDiscussion();
+        }
+    }
+
+    private void startMayorElection() {
+        if (currentGame == null) return;
+        currentGame.setState(GameState.DAY_MAYOR_ELECTION);
+
+        broadcast(Component.text("=== 시장 선출 투표 ===", NamedTextColor.GOLD, TextDecoration.BOLD));
+        broadcast(Component.text("30초 내에 시장으로 선출할 플레이어를 선택하세요!", NamedTextColor.GOLD));
+
+        for (Player p : currentGame.getAlivePlayers()) {
+            MayorElectionGUI.open(p, currentGame);
+        }
+
+        // Bot auto-vote for mayor
+        if (currentGame.isTestMode() && !currentGame.getAliveBotUUIDs().isEmpty()) {
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (currentGame == null || currentGame.getState() != GameState.DAY_MAYOR_ELECTION) return;
+                List<UUID> allAlive = currentGame.getAllAliveUUIDs();
+                Random rand = new Random();
+                for (UUID botUUID : new ArrayList<>(currentGame.getAliveBotUUIDs())) {
+                    List<UUID> targets = allAlive.stream()
+                            .filter(u -> !u.equals(botUUID))
+                            .collect(Collectors.toList());
+                    if (!targets.isEmpty()) {
+                        currentGame.getMayorVotes().put(botUUID, targets.get(rand.nextInt(targets.size())));
+                    }
+                }
+            }, 40L);
+        }
+
+        cancelPhaseTask();
+        BukkitTask task = new BukkitRunnable() {
+            int remaining = 30;
+            @Override
+            public void run() {
+                if (currentGame == null || currentGame.getState() != GameState.DAY_MAYOR_ELECTION) { cancel(); return; }
+                if (remaining <= 0) { cancel(); resolveMayorElection(); return; }
+                broadcastActionBar(Component.text("시장 선출 투표: ", NamedTextColor.GOLD)
+                        .append(Component.text(remaining + "초", NamedTextColor.WHITE)));
+                remaining--;
+            }
+        }.runTaskTimer(plugin, 0L, 20L);
+        currentGame.setPhaseTaskId(task.getTaskId());
+    }
+
+    private void resolveMayorElection() {
+        if (currentGame == null) return;
+
+        for (Player p : currentGame.getAlivePlayers()) {
+            if (p.getOpenInventory().getTopInventory().getHolder() instanceof MayorElectionGUI.Holder) {
+                p.closeInventory();
+            }
+        }
+
+        Map<UUID, UUID> votes = currentGame.getMayorVotes();
+        Map<UUID, Integer> voteCounts = new HashMap<>();
+        for (UUID nominee : votes.values()) {
+            if (!nominee.equals(MafiaGame.PASS_UUID)) voteCounts.merge(nominee, 1, Integer::sum);
+        }
+
+        if (voteCounts.isEmpty()) {
+            broadcast(Component.text("투표 결과 시장이 선출되지 않았습니다.", NamedTextColor.GRAY));
+        } else {
+            int max = Collections.max(voteCounts.values());
+            List<UUID> top = voteCounts.entrySet().stream()
+                    .filter(e -> e.getValue() == max)
+                    .map(Map.Entry::getKey)
+                    .toList();
+            if (top.size() > 1) {
+                broadcast(Component.text("동점으로 시장이 선출되지 않았습니다.", NamedTextColor.GRAY));
+            } else {
+                UUID mayorUUID = top.get(0);
+                currentGame.setMayorUUID(mayorUUID);
+                String mayorName = currentGame.getParticipantName(mayorUUID);
+                broadcast(Component.text("[시장] " + mayorName + "님이 시장으로 선출되었습니다! (" + max + "표)",
+                        NamedTextColor.GOLD, TextDecoration.BOLD));
+            }
+        }
 
         updateScoreboard();
+        // Day 1 has no discussion: go straight to night after mayor election
+        startNight();
+    }
+
+    private void startDayDiscussion() {
+        if (currentGame == null) return;
+        currentGame.setState(GameState.DAY_DISCUSSION);
+        broadcast(Component.text("자유롭게 이동하고 토론하세요. 2분 후 투표를 시작합니다.", NamedTextColor.YELLOW));
+
         cancelPhaseTask();
         BukkitTask task = new BukkitRunnable() {
             int remaining = 120;
@@ -583,8 +687,12 @@ public class GameManager {
     public void submitMafiaVote(Player mafia, UUID target) {
         if (currentGame == null || currentGame.getState() != GameState.NIGHT_MAFIA) return;
         if (currentGame.getRole(mafia) != Role.MAFIA) return;
-        currentGame.getMafiaVotes().put(mafia.getUniqueId(), target);
-        mafia.sendMessage(Component.text("타겟을 선택했습니다.", NamedTextColor.RED));
+        currentGame.getMafiaVotes().put(mafia.getUniqueId(), target); // may be PASS_UUID
+        if (target.equals(MafiaGame.PASS_UUID)) {
+            mafia.sendMessage(Component.text("행동을 건너뛰었습니다.", NamedTextColor.GRAY));
+        } else {
+            mafia.sendMessage(Component.text("타겟을 선택했습니다.", NamedTextColor.RED));
+        }
         mafia.closeInventory();
 
         if (currentGame.getMafiaVotes().size() >= currentGame.getAllAliveMafiaUUIDs().size()) {
@@ -601,7 +709,13 @@ public class GameManager {
             return;
         }
         Map<UUID, Integer> counts = new HashMap<>();
-        for (UUID target : votes.values()) counts.merge(target, 1, Integer::sum);
+        for (UUID target : votes.values()) {
+            if (!target.equals(MafiaGame.PASS_UUID)) counts.merge(target, 1, Integer::sum);
+        }
+        if (counts.isEmpty()) {
+            currentGame.setMafiaKillTarget(null);
+            return;
+        }
         int max = Collections.max(counts.values());
         List<UUID> top = counts.entrySet().stream().filter(e -> e.getValue() == max).map(Map.Entry::getKey).toList();
         UUID chosen = top.get(new Random().nextInt(top.size()));
@@ -672,8 +786,12 @@ public class GameManager {
     public void submitDoctorSave(Player doctor, UUID target) {
         if (currentGame == null || currentGame.getState() != GameState.NIGHT_DOCTOR) return;
         if (currentGame.getRole(doctor) != Role.DOCTOR) return;
-        currentGame.setDoctorSaveTarget(target);
-        doctor.sendMessage(Component.text("보호 대상을 선택했습니다.", NamedTextColor.GREEN));
+        if (target.equals(MafiaGame.PASS_UUID)) {
+            doctor.sendMessage(Component.text("행동을 건너뛰었습니다.", NamedTextColor.GRAY));
+        } else {
+            currentGame.setDoctorSaveTarget(target);
+            doctor.sendMessage(Component.text("보호 대상을 선택했습니다.", NamedTextColor.GREEN));
+        }
         doctor.closeInventory();
         cancelPhaseTask();
         startPolicePhase();
@@ -739,8 +857,12 @@ public class GameManager {
     public void submitPoliceCheck(Player police, UUID target) {
         if (currentGame == null || currentGame.getState() != GameState.NIGHT_POLICE) return;
         if (currentGame.getRole(police) != Role.POLICE) return;
-        currentGame.setPoliceCheckTarget(target);
-        police.sendMessage(Component.text("조사 대상을 선택했습니다.", NamedTextColor.BLUE));
+        if (target.equals(MafiaGame.PASS_UUID)) {
+            police.sendMessage(Component.text("행동을 건너뛰었습니다.", NamedTextColor.GRAY));
+        } else {
+            currentGame.setPoliceCheckTarget(target);
+            police.sendMessage(Component.text("조사 대상을 선택했습니다.", NamedTextColor.BLUE));
+        }
         police.closeInventory();
         cancelPhaseTask();
         resolveNight();
@@ -887,6 +1009,15 @@ public class GameManager {
         }, 60L);
     }
 
+    public void handlePlayerQuit(Player player) {
+        if (currentGame == null) return;
+        if (!currentGame.isAlive(player.getUniqueId())) return;
+        currentGame.getAlivePlayers().remove(player);
+        broadcast(Component.text(player.getName() + "님이 게임에서 나갔습니다.", NamedTextColor.GRAY));
+        updateScoreboard();
+        checkWinConditions();
+    }
+
     public void forceEnd() {
         if (currentGame != null) {
             endGame(null, null);
@@ -900,6 +1031,14 @@ public class GameManager {
             Bukkit.getScheduler().cancelTask(currentGame.getPhaseTaskId());
             currentGame.setPhaseTaskId(-1);
         }
+    }
+
+    /** Prevents hunger and grants permanent regeneration for alive players. */
+    private void applyGameBuffs(Player p) {
+        p.setFoodLevel(20);
+        p.setSaturation(20f);
+        p.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,
+                Integer.MAX_VALUE / 2, 0, true, false, false));
     }
 
     private void broadcast(Component message) {

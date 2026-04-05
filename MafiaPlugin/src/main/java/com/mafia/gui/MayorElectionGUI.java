@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-public class NominationGUI {
+public class MayorElectionGUI {
 
     public static class Holder implements InventoryHolder {
         private final UUID voterId;
@@ -33,7 +33,6 @@ public class NominationGUI {
     }
 
     public static void open(Player voter, MafiaGame game) {
-        // Build candidate list: real players (except self) + bots
         List<UUID> candidateUUIDs = new ArrayList<>();
         List<String> candidateNames = new ArrayList<>();
 
@@ -56,12 +55,12 @@ public class NominationGUI {
         if (size == 0) size = 9;
 
         Holder holder = new Holder(voter.getUniqueId());
-        Inventory inv = Bukkit.createInventory(holder, size, Component.text("심판대에 올릴 플레이어 선택"));
+        Inventory inv = Bukkit.createInventory(holder, size, Component.text("시장 선출 투표"));
         holder.setInventory(inv);
 
         for (int i = 0; i < candidateUUIDs.size() && i < size; i++) {
             holder.getCandidateIds().add(candidateUUIDs.get(i));
-            ItemStack item = new ItemStack(Material.ORANGE_WOOL);
+            ItemStack item = new ItemStack(Material.YELLOW_WOOL);
             ItemMeta meta = item.getItemMeta();
             meta.displayName(Component.text(candidateNames.get(i), NamedTextColor.WHITE));
             item.setItemMeta(meta);

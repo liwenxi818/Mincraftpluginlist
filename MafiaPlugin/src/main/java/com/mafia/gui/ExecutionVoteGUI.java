@@ -56,6 +56,12 @@ public class ExecutionVoteGUI {
         spareItem.setItemMeta(spareMeta);
         inv.setItem(6, spareItem);
 
+        ItemStack passItem = new ItemStack(Material.GRAY_WOOL);
+        ItemMeta passMeta = passItem.getItemMeta();
+        passMeta.displayName(Component.text("패스 (기권)", NamedTextColor.GRAY, TextDecoration.ITALIC));
+        passItem.setItemMeta(passMeta);
+        inv.setItem(4, passItem);
+
         voter.openInventory(inv);
     }
 }

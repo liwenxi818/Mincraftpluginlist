@@ -8,6 +8,9 @@ import java.util.*;
 
 public class MafiaGame {
 
+    /** Sentinel UUID used as a "pass / abstain" vote value. */
+    public static final UUID PASS_UUID = new UUID(0L, 0L);
+
     private final List<Player> alivePlayers = new ArrayList<>();
     private final List<Player> deadPlayers = new ArrayList<>();
     private final Map<UUID, Role> roles = new HashMap<>();
@@ -28,6 +31,10 @@ public class MafiaGame {
     private UUID doctorSaveTarget = null;
     private UUID policeCheckTarget = null;
     private final Map<UUID, UUID> mafiaVotes = new HashMap<>();
+
+    // Mayor
+    private UUID mayorUUID = null;
+    private final Map<UUID, UUID> mayorVotes = new HashMap<>();
 
     // Tribunal
     private UUID playerOnTrial = null;
@@ -118,6 +125,10 @@ public class MafiaGame {
     public UUID getPoliceCheckTarget() { return policeCheckTarget; }
     public void setPoliceCheckTarget(UUID target) { policeCheckTarget = target; }
     public Map<UUID, UUID> getMafiaVotes() { return mafiaVotes; }
+
+    public UUID getMayorUUID() { return mayorUUID; }
+    public void setMayorUUID(UUID uuid) { mayorUUID = uuid; }
+    public Map<UUID, UUID> getMayorVotes() { return mayorVotes; }
 
     public UUID getPlayerOnTrial() { return playerOnTrial; }
     public void setPlayerOnTrial(UUID uuid) { playerOnTrial = uuid; }

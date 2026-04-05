@@ -59,7 +59,20 @@ public class MafiaCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage("플레이어만 사용 가능합니다.");
                     return true;
                 }
-                gm.startTestGame(player);
+                if (args.length >= 2) {
+                    try {
+                        int botCount = Integer.parseInt(args[1]);
+                        if (botCount < 0) {
+                            player.sendMessage(Component.text("봇 수는 0 이상이어야 합니다.", NamedTextColor.RED));
+                            return true;
+                        }
+                        gm.startTestGame(player, botCount);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage(Component.text("봇 수는 숫자여야 합니다. 예: /mafia test 3", NamedTextColor.RED));
+                    }
+                } else {
+                    gm.startTestGame(player, -1);
+                }
             }
             case "end" -> {
                 if (!sender.hasPermission("mafia.admin")) {
@@ -107,7 +120,7 @@ public class MafiaCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("/mafia join - 대기실 참가", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/mafia leave - 대기실 나가기", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/mafia start - 게임 시작 (4명 이상)", NamedTextColor.YELLOW));
-        sender.sendMessage(Component.text("/mafia test - 테스트 모드 시작 (1명 + 봇)", NamedTextColor.GREEN));
+        sender.sendMessage(Component.text("/mafia test [봇 수] - 테스트 모드 시작 (봇 수 미지정 시 최소 인원 자동 채움)", NamedTextColor.GREEN));
         sender.sendMessage(Component.text("/mafia status - 현재 상태", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("/mafia end - 게임 강제 종료 (관리자)", NamedTextColor.RED));
         sender.sendMessage(Component.text("/mafia vote - 투표 즉시 시작 (관리자)", NamedTextColor.RED));
@@ -118,6 +131,9 @@ public class MafiaCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             List<String> subs = Arrays.asList("join", "leave", "start", "test", "status", "end", "vote");
             return subs.stream().filter(s -> s.startsWith(args[0].toLowerCase())).collect(Collectors.toList());
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("test")) {
+            return Arrays.asList("1", "2", "3", "4", "5", "6", "7");
         }
         return List.of();
     }

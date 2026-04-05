@@ -5,6 +5,7 @@ import com.mafia.game.GameState;
 import com.mafia.game.MafiaGame;
 import com.mafia.game.Role;
 import com.mafia.gui.ExecutionVoteGUI;
+import com.mafia.gui.MayorElectionGUI;
 import com.mafia.gui.NightActionGUI;
 import com.mafia.gui.NominationGUI;
 import com.mafia.manager.GameManager;
@@ -13,6 +14,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
@@ -35,7 +37,8 @@ public class MafiaListener implements Listener {
         var topHolder = event.getView().getTopInventory().getHolder();
         if (topHolder == null) return;
         if (!event.getView().getTopInventory().equals(event.getClickedInventory())) {
-            if (topHolder instanceof NightActionGUI.Holder || topHolder instanceof NominationGUI.Holder || topHolder instanceof ExecutionVoteGUI.Holder) {
+            if (topHolder instanceof NightActionGUI.Holder || topHolder instanceof NominationGUI.Holder
+                    || topHolder instanceof ExecutionVoteGUI.Holder || topHolder instanceof MayorElectionGUI.Holder) {
                 event.setCancelled(true);
             }
             return;
@@ -54,6 +57,8 @@ public class MafiaListener implements Listener {
             handleNomination(player, holder, slot, game);
         } else if (topHolder instanceof ExecutionVoteGUI.Holder holder) {
             handleExecutionVote(player, holder, slot, game);
+        } else if (topHolder instanceof MayorElectionGUI.Holder holder) {
+            handleMayorElection(player, holder, slot, game);
         }
     }
 
@@ -78,14 +83,45 @@ public class MafiaListener implements Listener {
 
         if (game.getState() != GameState.DAY_NOMINATION) return;
 
+        if (nominee.equals(MafiaGame.PASS_UUID)) {
+            player.sendMessage(Component.text("투표를 기권했습니다.", NamedTextColor.GRAY));
+            player.closeInventory();
+            return;
+        }
+
         game.getNominationVotes().put(player.getUniqueId(), nominee);
         String nomineeName = game.getParticipantName(nominee);
         player.sendMessage(Component.text(nomineeName + "님을 지목했습니다.", NamedTextColor.YELLOW));
         player.closeInventory();
     }
 
+    private void handleMayorElection(Player player, MayorElectionGUI.Holder holder, int slot, MafiaGame game) {
+        List<UUID> candidates = holder.getCandidateIds();
+        if (slot >= candidates.size()) return;
+        UUID nominee = candidates.get(slot);
+
+        if (game.getState() != GameState.DAY_MAYOR_ELECTION) return;
+
+        if (nominee.equals(MafiaGame.PASS_UUID)) {
+            player.sendMessage(Component.text("시장 투표를 기권했습니다.", NamedTextColor.GRAY));
+            player.closeInventory();
+            return;
+        }
+
+        game.getMayorVotes().put(player.getUniqueId(), nominee);
+        String nomineeName = game.getParticipantName(nominee);
+        player.sendMessage(Component.text(nomineeName + "님을 시장 후보로 선택했습니다.", NamedTextColor.YELLOW));
+        player.closeInventory();
+    }
+
     private void handleExecutionVote(Player player, ExecutionVoteGUI.Holder holder, int slot, MafiaGame game) {
         if (game.getState() != GameState.DAY_VOTE) return;
+
+        if (slot == 4) {
+            player.sendMessage(Component.text("투표를 기권했습니다.", NamedTextColor.GRAY));
+            player.closeInventory();
+            return;
+        }
 
         Boolean vote = null;
         if (slot == 2) vote = true;
@@ -105,14 +141,17 @@ public class MafiaListener implements Listener {
     }
 
     @EventHandler
+    public void onFoodLevelChange(FoodLevelChangeEvent event) {
+        if (gm.getCurrentGame() != null) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
-        MafiaGame game = gm.getCurrentGame();
-        if (game == null) return;
-        if (game.isAlive(player.getUniqueId())) {
-            game.getAlivePlayers().remove(player);
-            if (gm.getCurrentGame() == null) return;
-            player.sendMessage(Component.text(player.getName() + "님이 게임에서 나갔습니다.", NamedTextColor.GRAY));
+        if (gm.getCurrentGame() != null) {
+            gm.handlePlayerQuit(player);
         }
         gm.getLobby().remove(player);
     }
