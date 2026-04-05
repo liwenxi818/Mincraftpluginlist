@@ -27,8 +27,9 @@ session.lock
 # 플러그인 jar (config만 추적)
 plugins/*.jar
 
-# bStats
+# bStats (serverUuid 포함 - 업로드 금지)
 plugins/bStats/
+**/plugins/bStats/
 
 # Maven build output
 target/
