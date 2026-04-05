@@ -6,7 +6,10 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.Sign;
 import org.bukkit.block.data.type.Door;
+import org.bukkit.block.data.type.Stairs;
+import org.bukkit.block.data.type.WallSign;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
@@ -33,6 +36,7 @@ public class HouseManager {
         // Campfire at world origin
         int cy0 = world.getHighestBlockYAt(0, 0);
         placeCampfire(world, 0, cy0 + 1, 0);
+        buildDiscussionArea(world, 0, cy0, 0);
 
         // Distribute houses across 4 sides: [NORTH, SOUTH, EAST, WEST]
         // NORTH side: houses at z = -dist, door faces SOUTH (toward campfire)
@@ -102,6 +106,62 @@ public class HouseManager {
                 (org.bukkit.block.data.type.Campfire) Material.CAMPFIRE.createBlockData();
         data.setLit(true);
         world.getBlockAt(x, y, z).setBlockData(data);
+    }
+
+    /**
+     * Builds a small discussion area around the campfire:
+     * - 4 oak stair "chairs" facing the campfire (N/S/E/W at distance 3)
+     * - 4 diagonal oak stair chairs at distance 3 (NE/NW/SE/SW)
+     * - An OAK_WALL_SIGN on a post at the north side with "마피아 마을"
+     */
+    private void buildDiscussionArea(World world, int cx, int groundY, int cz) {
+        // Floor circle: 5x5 stone brick platform (excluding corners)
+        int[][] floorOffsets = {
+            {-2,-1},{-2,0},{-2,1},
+            {-1,-2},{-1,-1},{-1,0},{-1,1},{-1,2},
+            {0,-2},{0,-1},{0,1},{0,2},
+            {1,-2},{1,-1},{1,0},{1,1},{1,2},
+            {2,-1},{2,0},{2,1}
+        };
+        for (int[] off : floorOffsets) {
+            world.getBlockAt(cx + off[0], groundY, cz + off[1]).setType(Material.STONE_BRICKS);
+        }
+
+        // 4 cardinal chairs (stair facing the campfire center)
+        // NORTH chair (z=-3): stair faces SOUTH toward campfire
+        placeChair(world, cx,     groundY + 1, cz - 3, BlockFace.SOUTH);
+        // SOUTH chair (z=+3): stair faces NORTH
+        placeChair(world, cx,     groundY + 1, cz + 3, BlockFace.NORTH);
+        // EAST  chair (x=+3): stair faces WEST
+        placeChair(world, cx + 3, groundY + 1, cz,     BlockFace.WEST);
+        // WEST  chair (x=-3): stair faces EAST
+        placeChair(world, cx - 3, groundY + 1, cz,     BlockFace.EAST);
+
+        // 4 diagonal chairs
+        placeChair(world, cx - 2, groundY + 1, cz - 2, BlockFace.SOUTH);
+        placeChair(world, cx + 2, groundY + 1, cz - 2, BlockFace.SOUTH);
+        placeChair(world, cx - 2, groundY + 1, cz + 2, BlockFace.NORTH);
+        placeChair(world, cx + 2, groundY + 1, cz + 2, BlockFace.NORTH);
+
+        // Sign post: OAK_FENCE at (cx, groundY+1, cz-5), wall sign on south face
+        world.getBlockAt(cx, groundY + 1, cz - 5).setType(Material.OAK_FENCE);
+        world.getBlockAt(cx, groundY + 2, cz - 5).setType(Material.OAK_FENCE);
+        Block signBlock = world.getBlockAt(cx, groundY + 3, cz - 5);
+        WallSign signData = (WallSign) Material.OAK_WALL_SIGN.createBlockData();
+        signData.setFacing(BlockFace.SOUTH);
+        signBlock.setBlockData(signData);
+        Sign sign = (Sign) signBlock.getState();
+        sign.line(0, Component.text("==========="));
+        sign.line(1, Component.text("마피아 마을"));
+        sign.line(2, Component.text("토론 광장"));
+        sign.line(3, Component.text("==========="));
+        sign.update(true);
+    }
+
+    private void placeChair(World world, int x, int y, int z, BlockFace facing) {
+        Stairs stair = (Stairs) Material.OAK_STAIRS.createBlockData();
+        stair.setFacing(facing);
+        world.getBlockAt(x, y, z).setBlockData(stair);
     }
 
     // ---- Spawn / Entrance locations ----

@@ -9,10 +9,13 @@ import com.mafia.gui.MayorElectionGUI;
 import com.mafia.gui.NightActionGUI;
 import com.mafia.gui.NominationGUI;
 import com.mafia.manager.GameManager;
+import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -137,6 +140,39 @@ public class MafiaListener implements Listener {
         int voterCount = game.getTotalAliveCount() - 1; // exclude trial player
         if (game.getExecutionVotes().size() >= voterCount) {
             gm.resolveExecutionVote(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onPlayerChat(AsyncChatEvent event) {
+        Player player = event.getPlayer();
+        MafiaGame game = gm.getCurrentGame();
+        if (game == null) return;
+        GameState state = game.getState();
+        if (state == GameState.WAITING || state == GameState.ENDED) return;
+
+        // Ghost chat: dead players send only to dead players
+        if (game.getDeadPlayers().contains(player)) {
+            event.setCancelled(true);
+            Component ghostMsg = Component.text("[유령] ", NamedTextColor.DARK_GRAY, TextDecoration.BOLD)
+                    .append(Component.text(player.getName() + ": ", NamedTextColor.GRAY))
+                    .append(event.message());
+            for (Player dead : game.getDeadPlayers()) {
+                dead.sendMessage(ghostMsg);
+            }
+            return;
+        }
+
+        // Mafia whisper: mafia players during NIGHT_MAFIA phase
+        if (state == GameState.NIGHT_MAFIA && game.getRole(player) == Role.MAFIA) {
+            event.setCancelled(true);
+            Component mafiaMsg = Component.text("[마피아] ", NamedTextColor.DARK_RED, TextDecoration.BOLD)
+                    .append(Component.text(player.getName() + ": ", NamedTextColor.RED))
+                    .append(event.message());
+            for (Player mafia : game.getMafiaPlayers()) {
+                mafia.sendMessage(mafiaMsg);
+            }
+            return;
         }
     }
 

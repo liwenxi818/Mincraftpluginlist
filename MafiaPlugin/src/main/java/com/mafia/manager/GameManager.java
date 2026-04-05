@@ -12,6 +12,7 @@ import com.mafia.util.ParticleUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.title.Title;
 import org.bukkit.*;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -19,6 +20,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.*;
+
+import java.time.Duration;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -939,6 +942,16 @@ public class GameManager {
         } else {
             player.sendMessage(Component.text("당신은 처형되었습니다. 관전 모드로 전환됩니다.", NamedTextColor.RED));
         }
+
+        // Show all survivor roles to the newly dead player
+        player.sendMessage(Component.text("─────────────────────────", NamedTextColor.DARK_GRAY));
+        player.sendMessage(Component.text("[ 생존자 역할 - 관전자 전용 ]", NamedTextColor.GOLD, TextDecoration.BOLD));
+        for (Player alive : currentGame.getAlivePlayers()) {
+            Role role = currentGame.getRole(alive);
+            player.sendMessage(Component.text("  " + alive.getName() + " → ", NamedTextColor.GRAY)
+                    .append(Component.text(role.getDisplayName(), role.getColor(), TextDecoration.BOLD)));
+        }
+        player.sendMessage(Component.text("─────────────────────────", NamedTextColor.DARK_GRAY));
     }
 
     // ---- Win Conditions ----
@@ -969,29 +982,62 @@ public class GameManager {
         cancelPhaseTask();
         currentGame.setState(GameState.ENDED);
 
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            p.sendActionBar(Component.text("게임 종료!", NamedTextColor.GOLD));
+        int finalDay = currentGame.getDayCount();
+
+        // Title result screen
+        Component titleText;
+        Component subtitleText = Component.text(finalDay + "일차 종료", NamedTextColor.YELLOW);
+        if (jokerWinner != null) {
+            titleText = Component.text("조커 승리!", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD);
+            subtitleText = Component.text(jokerWinner.getName() + "님이 처형되어 승리! (" + finalDay + "일차)", NamedTextColor.YELLOW);
+        } else if (winner == Role.MAFIA) {
+            titleText = Component.text("마피아 승리!", NamedTextColor.RED, TextDecoration.BOLD);
+        } else {
+            titleText = Component.text("시민팀 승리!", NamedTextColor.AQUA, TextDecoration.BOLD);
         }
-        broadcast(Component.text("=== 역할 공개 ===", NamedTextColor.GOLD, TextDecoration.BOLD));
+        Title title = Title.title(titleText, subtitleText,
+                Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(5), Duration.ofMillis(1000)));
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            p.showTitle(title);
+        }
+
+        // Role reveal in chat
         List<Player> allPlayers = new ArrayList<>();
         allPlayers.addAll(currentGame.getAlivePlayers());
         allPlayers.addAll(currentGame.getDeadPlayers());
+
+        broadcast(Component.text("═══════════════════════════", NamedTextColor.GOLD));
+        broadcast(Component.text("  게임 종료 - " + finalDay + "일차", NamedTextColor.GOLD, TextDecoration.BOLD));
+        broadcast(Component.text("═══════════════════════════", NamedTextColor.GOLD));
+        broadcast(Component.text("  ▶ 역할 공개", NamedTextColor.YELLOW, TextDecoration.BOLD));
         for (Player p : allPlayers) {
             Role role = currentGame.getRole(p);
-            broadcast(Component.text(p.getName() + ": ", NamedTextColor.WHITE)
-                    .append(Component.text(role.getDisplayName(), role.getColor())));
+            boolean alive = currentGame.isAlive(p.getUniqueId());
+            Component status = alive
+                    ? Component.text(" [생존]", NamedTextColor.GREEN)
+                    : Component.text(" [사망]", NamedTextColor.GRAY);
+            broadcast(Component.text("  " + p.getName(), NamedTextColor.WHITE)
+                    .append(status)
+                    .append(Component.text(" → ", NamedTextColor.DARK_GRAY))
+                    .append(Component.text(role.getDisplayName(), role.getColor(), TextDecoration.BOLD)));
         }
-        // Reveal bot roles
         if (currentGame.isTestMode()) {
             Set<UUID> allBotUUIDs = new LinkedHashSet<>();
             allBotUUIDs.addAll(currentGame.getAliveBotUUIDs());
             allBotUUIDs.addAll(currentGame.getDeadBotUUIDs());
             for (UUID botUUID : allBotUUIDs) {
                 Role role = currentGame.getRole(botUUID);
-                broadcast(Component.text(currentGame.getBotName(botUUID) + ": ", NamedTextColor.WHITE)
-                        .append(Component.text(role.getDisplayName(), role.getColor())));
+                boolean alive = currentGame.isBotAlive(botUUID);
+                Component status = alive
+                        ? Component.text(" [생존]", NamedTextColor.GREEN)
+                        : Component.text(" [사망]", NamedTextColor.GRAY);
+                broadcast(Component.text("  " + currentGame.getBotName(botUUID), NamedTextColor.WHITE)
+                        .append(status)
+                        .append(Component.text(" → ", NamedTextColor.DARK_GRAY))
+                        .append(Component.text(role.getDisplayName(), role.getColor(), TextDecoration.BOLD)));
             }
         }
+        broadcast(Component.text("═══════════════════════════", NamedTextColor.GOLD));
 
         World mainWorld = Bukkit.getWorlds().get(0);
         for (Player p : allPlayers) {
